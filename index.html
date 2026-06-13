@@ -3,642 +3,503 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Neon Roller: Underworld (Atmosphere)</title>
+    <title>Subway Surfers Clone</title>
     <style>
         body {
             margin: 0; padding: 0; overflow: hidden;
-            background-color: #050510;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #87CEEB; /* Sky blue */
+            font-family: 'Arial', sans-serif;
             touch-action: none;
+            user-select: none;
         }
         canvas { display: block; width: 100vw; height: 100vh; }
         
         .screen {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(5, 5, 16, 0.95);
+            background: rgba(0, 0, 0, 0.7);
             display: none; flex-direction: column;
             justify-content: center; align-items: center;
             color: white; z-index: 10;
         }
-        .screen h1 {
-            font-size: 32px; color: #4cc9f0;
-            text-shadow: 0 0 15px rgba(76, 201, 240, 0.8);
-            margin-bottom: 10px; text-align: center;
-        }
-        .screen p { color: #aaa; margin-bottom: 30px; text-align: center; padding: 0 20px;}
         
         #ui {
-            position: absolute; top: 20px; left: 0; width: 100%;
-            text-align: center; color: #4cc9f0;
-            font-size: 22px; font-weight: 800;
+            position: absolute; top: 20px; width: 100%;
+            display: flex; justify-content: space-around;
+            color: white; font-size: 24px; font-weight: bold;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
             pointer-events: none;
-            text-shadow: 0 0 10px rgba(76, 201, 240, 0.8);
-            display: none;
+            z-index: 5;
         }
-        #underworldUI {
-            position: absolute; top: 60px; left: 0; width: 100%;
-            text-align: center; color: #ff3300;
-            font-size: 24px; font-weight: 900;
-            pointer-events: none;
-            text-shadow: 0 0 15px rgba(255, 51, 0, 0.8);
-            display: none;
-            animation: pulse 0.8s infinite alternate;
-        }
-        @keyframes pulse { from { opacity: 0.7; } to { opacity: 1; } }
-
-        #pauseBtn {
-            position: absolute; left: 20px; top: 15px;
-            font-size: 20px; padding: 8px 15px;
-            border-radius: 10px; border: 2px solid #4cc9f0;
-            background: rgba(0,0,0,0.6); color: white;
-            pointer-events: auto; cursor: pointer;
-            display: none;
-        }
-        #pauseBtn:active { background: rgba(76, 201, 240, 0.3); }
 
         .menu-btn {
-            background: linear-gradient(45deg, #e94560, #c1364d);
-            color: white; border: none;
-            padding: 15px 40px; font-size: 20px; font-weight: bold;
-            border-radius: 30px; cursor: pointer; margin: 10px;
-            pointer-events: auto; min-width: 250px;
-            box-shadow: 0 4px 15px rgba(233, 69, 96, 0.4);
+            background: #ffcc00; color: #333; border: none;
+            padding: 15px 40px; font-size: 24px; font-weight: bold;
+            border-radius: 10px; cursor: pointer; margin: 10px;
+            box-shadow: 0 4px 0 #cc9900;
         }
-        .menu-btn:active { transform: scale(0.95); }
-        .menu-btn.secondary {
-            background: linear-gradient(45deg, #4cc9f0, #0f3460);
-            box-shadow: 0 4px 15px rgba(76, 201, 240, 0.4);
-        }
+        .menu-btn:active { transform: translateY(2px); box-shadow: 0 2px 0 #cc9900; }
     </style>
-    <!-- THREE.JS ЛОКАЛЬНО (положи three.min.js рядом с этим файлом) -->
-    <script src="three.min.js"></script>
+    <script src="three.min.js" onerror="document.getElementById('errorOverlay').style.display = 'block'; document.getElementById('errorMsg').innerText = 'Failed to load three.min.js. Please ensure the file exists in the same directory.';"></script>
 </head>
 <body>
 
     <div id="startScreen" class="screen" style="display: flex;">
-        <h1>NEON ROLLER: UNDERWORLD</h1>
-        <p>Уворачивайся от блоков.<br>Избегай красных ям!<br>Рекомендуется включить звук 🔊</p>
-        <button class="menu-btn" onclick="startGame()">НАЧАТЬ ИГРУ</button>
+        <h1 style="font-size: 48px; color: #ffcc00; text-shadow: 3px 3px 0 #333;">SUBWAY SURFERS</h1>
+        <button class="menu-btn" onclick="startGame()">START</button>
     </div>
 
-    <div id="ui">
-        <button id="pauseBtn" onclick="togglePause()">⏸</button>
-        УРОВЕНЬ: <span id="level">1</span> | СЧЕТ: <span id="score">0</span>
-    </div>
-    <div id="underworldUI">⚠ НИЖНИЙ УРОВЕНЬ: <span id="uwScore">0</span>/30 ⚠</div>
-    
-    <div id="pauseScreen" class="screen">
-        <h1>ПАУЗА</h1>
-        <button class="menu-btn secondary" onclick="togglePause()">▶ ПРОДОЛЖИТЬ</button>
-        <button class="menu-btn secondary" id="muteBtn" onclick="toggleMute()">🔊 ВЫКЛЮЧИТЬ МУЗЫКУ</button>
-        <button class="menu-btn" onclick="restartGame()">🔄 НАЧАТЬ ЗАНОВО</button>
+    <div id="ui" style="display: none;">
+        <div>SCORE: <span id="score">0</span></div>
+        <div>COINS: <span id="coins">0</span></div>
     </div>
 
     <div id="gameOverScreen" class="screen">
-        <h1 style="color: #e94560; text-shadow: 0 0 15px rgba(233, 69, 96, 0.8);">СТОЛКНОВЕНИЕ!</h1>
-        <p>Твой счет: <span id="finalScore">0</span></p>
-        <button class="menu-btn" onclick="restartGame()">🔄 ИГРАТЬ СНОВА</button>
+        <h1 style="font-size: 48px; color: #ff4444;">GAME OVER</h1>
+        <p style="font-size: 24px;">Score: <span id="finalScore">0</span></p>
+        <button class="menu-btn" onclick="restartGame()">RETRY</button>
+    </div>
+
+    <div id="errorOverlay" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(255,0,0,0.8); color:white; padding:20px; z-index:1000; display:none; overflow:auto;">
+        <h1>RUNTIME ERROR</h1>
+        <pre id="errorMsg"></pre>
+        <button class="menu-btn" onclick="location.reload()">RELOAD</button>
     </div>
 
     <script>
-        let audioCtx;
-        let rollingNode, rollingGain, rollingFilter;
-        let musicGain;
-        let melodyTimer = null;
-        let currentStep = 0;
-        let nextNoteTime = 0;
-        const lookahead = 25.0;
-        const scheduleAheadTime = 0.1;
-        let animationId = null;
-
-        const melodies = [
-            [110.00, 130.81, 164.81, 196.00, 110.00, 146.83, 164.81, 130.81],
-            [130.81, 164.81, 196.00, 261.63, 196.00, 164.81, 130.81, 146.83],
-            [164.81, 196.00, 220.00, 329.63, 164.81, 196.00, 146.83, 130.81]
-        ];
-        const underworldMelody = [55.00, 58.27, 55.00, 65.41, 51.91, 55.00, 58.27, 49.00];
-        let currentMelodyIndex = 0;
-        let isUnderworld = false;
-        let underworldPoints = 0;
-        const underworldTarget = 30;
-        let nextPitScore = 60;
-
-        let isPaused = false;
-        let isMusicMuted = false;
-
-        function initAudio() {
-            const AudioContext = window.AudioContext || window.webkitAudioContext;
-            audioCtx = new AudioContext();
-
-            const bufferSize = 2 * audioCtx.sampleRate;
-            const noiseBuffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
-            const output = noiseBuffer.getChannelData(0);
-            for (let i = 0; i < bufferSize; i++) output[i] = Math.random() * 2 - 1;
-            
-            rollingNode = audioCtx.createBufferSource();
-            rollingNode.buffer = noiseBuffer;
-            rollingNode.loop = true;
-            rollingFilter = audioCtx.createBiquadFilter();
-            rollingFilter.type = 'lowpass';
-            rollingFilter.frequency.value = 300;
-            rollingGain = audioCtx.createGain();
-            rollingGain.gain.value = 0;
-            rollingNode.connect(rollingFilter).connect(rollingGain).connect(audioCtx.destination);
-            rollingNode.start();
-
-            musicGain = audioCtx.createGain();
-            musicGain.gain.value = isMusicMuted ? 0 : 0.12;
-            musicGain.connect(audioCtx.destination);
-            currentStep = 0;
-            nextNoteTime = audioCtx.currentTime + 0.1;
-            scheduler();
-        }
-
-        function scheduler() {
-            if (isPaused) { melodyTimer = window.setTimeout(scheduler, lookahead); return; }
-            while (nextNoteTime < audioCtx.currentTime + scheduleAheadTime) {
-                scheduleNote(currentStep, nextNoteTime);
-                nextNote();
-            }
-            melodyTimer = window.setTimeout(scheduler, lookahead);
-        }
-
-        function scheduleNote(beatNumber, time) {
-            const osc = audioCtx.createOscillator();
-            const gain = audioCtx.createGain();
-            const filter = audioCtx.createBiquadFilter();
-            const currentMelody = isUnderworld ? underworldMelody : melodies[currentMelodyIndex];
-            osc.type = isUnderworld ? 'square' : 'sawtooth';
-            osc.frequency.value = currentMelody[beatNumber % currentMelody.length];
-            filter.type = 'lowpass';
-            filter.frequency.value = isUnderworld ? 400 : 800;
-            filter.Q.value = isUnderworld ? 15 : 5;
-            gain.gain.setValueAtTime(0, time);
-            gain.gain.linearRampToValueAtTime(1.0, time + 0.05);
-            gain.gain.exponentialRampToValueAtTime(0.01, time + (isUnderworld ? 0.2 : 0.4));
-            osc.connect(filter).connect(gain).connect(musicGain);
-            osc.start(time);
-            osc.stop(time + 0.45);
-        }
-
-        function nextNote() {
-            const beatDuration = isUnderworld ? 0.25 : 0.5;
-            nextNoteTime += beatDuration * (60.0 / 110);
-            currentStep++;
-        }
-
-        function playCrashSound() {
-            if (!audioCtx) return;
-            const osc = audioCtx.createOscillator();
-            const gain = audioCtx.createGain();
-            osc.type = 'sawtooth';
-            osc.frequency.setValueAtTime(120, audioCtx.currentTime);
-            osc.frequency.exponentialRampToValueAtTime(40, audioCtx.currentTime + 0.3);
-            gain.gain.setValueAtTime(0.6, audioCtx.currentTime);
-            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
-            osc.connect(gain).connect(audioCtx.destination);
-            osc.start(); osc.stop(audioCtx.currentTime + 0.3);
-        }
-
-        function updateRollingSound(currentSpeed) {
-            if (!rollingGain || isPaused) return;
-            const targetVolume = Math.min(0.15, 0.05 + (currentSpeed * 0.1));
-            rollingGain.gain.setTargetAtTime(targetVolume, audioCtx.currentTime, 0.1);
-            rollingFilter.frequency.setTargetAtTime(300 + (currentSpeed * 200), audioCtx.currentTime, 0.1);
-        }
-
-        function stopAllSounds() {
-            if (rollingGain) rollingGain.gain.setTargetAtTime(0, audioCtx.currentTime, 0.1);
-            if (melodyTimer) { window.clearTimeout(melodyTimer); melodyTimer = null; }
-        }
-
-        function togglePause() {
-            if (!gameRunning && !isPaused) return;
-            isPaused = !isPaused;
-            const pauseScreen = document.getElementById('pauseScreen');
-            const pauseBtn = document.getElementById('pauseBtn');
-            if (isPaused) {
-                pauseScreen.style.display = 'flex';
-                pauseBtn.innerText = '▶';
-                if (rollingGain) rollingGain.gain.setTargetAtTime(0, audioCtx.currentTime, 0.1);
-            } else {
-                pauseScreen.style.display = 'none';
-                pauseBtn.innerText = '⏸';
-                gameRunning = true;
-                updateRollingSound(speed);
-            }
-        }
-
-        function toggleMute() {
-            isMusicMuted = !isMusicMuted;
-            const muteBtn = document.getElementById('muteBtn');
-            if (isMusicMuted) {
-                muteBtn.innerText = '🔇 ВКЛЮЧИТЬ МУЗЫКУ';
-                if (musicGain) musicGain.gain.setTargetAtTime(0, audioCtx.currentTime, 0.1);
-            } else {
-                muteBtn.innerText = '🔊 ВЫКЛЮЧИТЬ МУЗЫКУ';
-                if (musicGain) musicGain.gain.setTargetAtTime(0.12, audioCtx.currentTime, 0.1);
-            }
-        }
-
-        // --- 3D СЦЕНА ---
-        const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x0d0221);
-        scene.fog = new THREE.Fog(0x0d0221, 20, 90);
-
-        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-        camera.position.set(0, 6, 12);
-        camera.lookAt(0, 0, -10);
-
-        const renderer = new THREE.WebGLRenderer({ antialias: true });
-        renderer.setSize(window.innerWidth, window.innerHeight);
-        renderer.shadowMap.enabled = true;
-        document.body.appendChild(renderer.domElement);
-
-        const ambientLight = new THREE.AmbientLight(0x404080, 0.5);
-        scene.add(ambientLight);
-        const dirLight = new THREE.DirectionalLight(0xaaddff, 0.8);
-        dirLight.position.set(0, 20, 10);
-        dirLight.castShadow = true;
-        scene.add(dirLight);
-
-        const moonGeo = new THREE.SphereGeometry(6, 32, 32);
-        const moonMat = new THREE.MeshBasicMaterial({ color: 0xaaddff });
-        const moon = new THREE.Mesh(moonGeo, moonMat);
-        moon.position.set(0, 25, -70);
-        scene.add(moon);
-
-        const glowGeo = new THREE.SphereGeometry(8, 32, 32);
-        const glowMat = new THREE.MeshBasicMaterial({ color: 0x4488ff, transparent: true, opacity: 0.3 });
-        const glow = new THREE.Mesh(glowGeo, glowMat);
-        glow.position.set(0, 25, -70);
-        scene.add(glow);
-
-        const playerGeo = new THREE.SphereGeometry(1, 32, 32);
-        const playerMat = new THREE.MeshStandardMaterial({ color: 0x4cc9f0, roughness: 0.2, metalness: 0.8, emissive: 0x0f3460, emissiveIntensity: 0.2 });
-        const player = new THREE.Mesh(playerGeo, playerMat);
-        player.position.y = 1; player.position.z = 0;
-        player.castShadow = true;
-        scene.add(player);
-
-        const gridHelper = new THREE.GridHelper(100, 100, 0x16213e, 0x0f3460);
-        gridHelper.position.z = -40;
-        scene.add(gridHelper);
-        const planeGeo = new THREE.PlaneGeometry(100, 200);
-        const planeMat = new THREE.MeshStandardMaterial({ color: 0x0b0c15, roughness: 0.8 });
-        const plane = new THREE.Mesh(planeGeo, planeMat);
-        plane.rotation.x = -Math.PI / 2; plane.position.z = -40;
-        plane.receiveShadow = true;
-        scene.add(plane);
-
-        const wallGeo = new THREE.BoxGeometry(0.5, 3, 200);
-        const wallMatNormal = new THREE.MeshStandardMaterial({ color: 0x00ffff, emissive: 0x0088ff, emissiveIntensity: 0.6 });
-        const wallMatFire = new THREE.MeshStandardMaterial({ color: 0xff3300, emissive: 0xff0000, emissiveIntensity: 0.8 });
-        const leftWall = new THREE.Mesh(wallGeo, wallMatNormal.clone());
-        leftWall.position.set(-9.2, 1.5, -40);
-        scene.add(leftWall);
-        const rightWall = new THREE.Mesh(wallGeo, wallMatNormal.clone());
-        rightWall.position.set(9.2, 1.5, -40);
-        scene.add(rightWall);
-
-        const ceilingGeo = new THREE.PlaneGeometry(100, 200);
-        const ceilingMat = new THREE.MeshStandardMaterial({ color: 0x220000, emissive: 0x550000, emissiveIntensity: 0.5, side: THREE.DoubleSide });
-        const ceiling = new THREE.Mesh(ceilingGeo, ceilingMat);
-        ceiling.rotation.x = Math.PI / 2;
-        ceiling.position.set(0, 15, -40);
-        ceiling.visible = false;
-        scene.add(ceiling);
-
-        const cityGroup = new THREE.Group();
-        const windowMat = new THREE.MeshBasicMaterial({ color: 0x00ffff });
-        const edgeMatNormal = new THREE.LineBasicMaterial({ color: 0x00ffff });
-
-        for (let i = 0; i < 40; i++) {
-            const height = 10 + Math.random() * 30;
-            const width = 3 + Math.random() * 5;
-            const depth = 3 + Math.random() * 5;
-
-            const b1Mat = new THREE.MeshStandardMaterial({ color: 0x0a0515, emissive: 0x1a0b2e, emissiveIntensity: 0.2 });
-            const b1 = new THREE.Mesh(new THREE.BoxGeometry(width, height, depth), b1Mat);
-            b1.position.set(-16 - Math.random() * 6, height / 2, -20 - i * 12);
-            const e1 = new THREE.LineSegments(new THREE.EdgesGeometry(b1.geometry), edgeMatNormal.clone());
-            b1.add(e1);
-            if (Math.random() > 0.3) {
-                const win = new THREE.Mesh(new THREE.PlaneGeometry(width * 0.6, height * 0.6), windowMat.clone());
-                win.position.z = depth / 2 + 0.1;
-                b1.add(win);
-            }
-            cityGroup.add(b1);
-
-            const b2Mat = new THREE.MeshStandardMaterial({ color: 0x0a0515, emissive: 0x1a0b2e, emissiveIntensity: 0.2 });
-            const b2 = new THREE.Mesh(new THREE.BoxGeometry(width, height, depth), b2Mat);
-            b2.position.set(16 + Math.random() * 6, height / 2, -20 - i * 12);
-            const e2 = new THREE.LineSegments(new THREE.EdgesGeometry(b2.geometry), edgeMatNormal.clone());
-            b2.add(e2);
-            if (Math.random() > 0.3) {
-                const win = new THREE.Mesh(new THREE.PlaneGeometry(width * 0.6, height * 0.6), windowMat.clone());
-                win.position.z = depth / 2 + 0.1;
-                b2.add(win);
-            }
-            cityGroup.add(b2);
-        }
-        scene.add(cityGroup);
-
-        let obstacles = [];
+        window.onerror = function(msg, url, lineNo, columnNo, error) {
+            document.getElementById('errorOverlay').style.display = 'block';
+            document.getElementById('errorMsg').innerText =
+                msg + '\n' + 'URL: ' + url + '\n' + 'Line: ' + lineNo + '\n' + 'Column: ' + columnNo + '\n' + 'Error object: ' + JSON.stringify(error);
+            return false;
+        };
+        // Game Variables
+        let scene, camera, renderer, clock;
         let gameRunning = false;
         let score = 0;
-        let level = 1;
-        let speed = 0.2;
-        let frameCount = 0;
-        let targetX = 0;
+        let coins = 0;
+        let speed = 20; // Units per second
 
-        function clearAllObstacles() {
-            for (let i = obstacles.length - 1; i >= 0; i--) {
-                let obs = obstacles[i];
-                scene.remove(obs);
-                if (obs.geometry) obs.geometry.dispose();
-                if (obs.material) {
-                    if (Array.isArray(obs.material)) obs.material.forEach(m => m.dispose());
-                    else obs.material.dispose();
-                }
-                obstacles.splice(i, 1);
-            }
+        // Player variables
+        let player;
+        let currentLane = 1; // 0: left, 1: middle, 2: right
+        let isJumping = false;
+        let jumpVelocity = 0;
+        const gravity = 0.015;
+        const jumpForce = 0.4;
+        let isRolling = false;
+        let rollTimer = 0;
+
+        // Obstacles & Coins
+        let obstacles = [];
+        let collectibleCoins = [];
+        let spawnTimer = 0;
+
+        // Touch controls
+        let touchStartX = 0;
+        let touchStartY = 0;
+        let touchEndX = 0;
+        let touchEndY = 0;
+
+        // Configuration
+        const LANES = [-4, 0, 4];
+
+        function init() {
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x87CEEB);
+            scene.fog = new THREE.Fog(0x87CEEB, 20, 100);
+
+            camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(0, 5, 10);
+            camera.lookAt(0, 2, -5);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.shadowMap.enabled = true;
+            document.body.appendChild(renderer.domElement);
+
+            clock = new THREE.Clock();
+
+            // Lighting
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+            scene.add(ambientLight);
+
+            const sunLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            sunLight.position.set(10, 20, 10);
+            sunLight.castShadow = true;
+            sunLight.shadow.camera.left = -20;
+            sunLight.shadow.camera.right = 20;
+            sunLight.shadow.camera.top = 20;
+            sunLight.shadow.camera.bottom = -20;
+            scene.add(sunLight);
+
+            // Player
+            createPlayer();
+
+            // Ground / Tracks
+            createEnvironment();
+
+            window.addEventListener('resize', onWindowResize, false);
+            window.addEventListener('keydown', handleKeyDown);
+            
+            // Touch events
+            window.addEventListener('touchstart', (e) => {
+                touchStartX = e.changedTouches[0].screenX;
+                touchStartY = e.changedTouches[0].screenY;
+            }, false);
+
+            window.addEventListener('touchend', (e) => {
+                touchEndX = e.changedTouches[0].screenX;
+                touchEndY = e.changedTouches[0].screenY;
+                handleSwipe();
+            }, false);
         }
 
-        function updateTargetX(clientX) {
-            targetX = ((clientX / window.innerWidth) * 2 - 1) * 10;
-        }
-        window.addEventListener('touchmove', (e) => {
-            e.preventDefault();
-            updateTargetX(e.touches[0].clientX);
-        }, { passive: false });
-        window.addEventListener('mousemove', (e) => { updateTargetX(e.clientX); });
+        function handleSwipe() {
+            const dx = touchEndX - touchStartX;
+            const dy = touchEndY - touchStartY;
+            const absX = Math.abs(dx);
+            const absY = Math.abs(dy);
 
-        function spawnObstacle() {
-            if (score >= nextPitScore && !isUnderworld && score > 0) {
-                spawnPit();
-                nextPitScore += 60;
-                return;
-            }
-            const width = Math.random() * 4 + 2;
-            const geo = new THREE.BoxGeometry(width, 1.5, 1.5);
-            let mat, type = 'normal', moveAxis = null, moveRange = 0;
-
-            if (!isUnderworld && level >= 3 && Math.random() < 0.3) {
-                type = 'moving';
-                moveAxis = Math.random() > 0.5 ? 'x' : 'y';
-                moveRange = moveAxis === 'x' ? 2.5 : 1.5;
-                mat = new THREE.MeshStandardMaterial({ color: 0xffaa00, emissive: 0x553300, emissiveIntensity: 0.5 });
-            } else if (isUnderworld) {
-                mat = new THREE.MeshStandardMaterial({ color: 0x39ff14, emissive: 0x105005, emissiveIntensity: 0.6 });
-                if (Math.random() < 0.4) {
-                    type = 'moving';
-                    moveAxis = Math.random() > 0.5 ? 'x' : 'y';
-                    moveRange = moveAxis === 'x' ? 3 : 2;
-                }
-            } else {
-                mat = new THREE.MeshStandardMaterial({ color: 0xe94560, emissive: 0x501020, emissiveIntensity: 0.4 });
-            }
-
-            const obs = new THREE.Mesh(geo, mat);
-            obs.position.x = (Math.random() - 0.5) * 16;
-            obs.position.y = type === 'moving' && moveAxis === 'y' ? 3 : 0.75;
-            obs.position.z = -70;
-            obs.castShadow = true;
-            obs.userData = { type, moveAxis, moveRange, initialX: obs.position.x, initialY: obs.position.y, passed: false };
-            scene.add(obs);
-            obstacles.push(obs);
-        }
-
-        function spawnPit() {
-            const geo = new THREE.CylinderGeometry(1.5, 1.5, 0.2, 32);
-            const mat = new THREE.MeshStandardMaterial({ color: 0xff0000, emissive: 0xff0000, emissiveIntensity: 0.8 });
-            const pit = new THREE.Mesh(geo, mat);
-            pit.position.x = (Math.random() - 0.5) * 16;
-            pit.position.y = 0.1;
-            pit.position.z = -70;
-            pit.userData = { type: 'pit', passed: false };
-            scene.add(pit);
-            obstacles.push(pit);
-        }
-
-        function checkCollision(p, o) {
-            const dx = Math.abs(p.position.x - o.position.x);
-            const dz = Math.abs(p.position.z - o.position.z);
-            const dy = Math.abs(p.position.y - o.position.y);
-            if (o.userData.type === 'pit') return dz < 1.5 && dx < 1.5;
-            const obsHalfWidth = o.geometry.parameters.width / 2;
-            const obsHalfHeight = o.geometry.parameters.height / 2;
-            return dz < 1.2 && dx < (1 + obsHalfWidth - 0.3) && dy < (1 + obsHalfHeight - 0.3);
-        }
-
-        function enterUnderworld() {
-            isUnderworld = true;
-            underworldPoints = 0;
-            document.getElementById('underworldUI').style.display = 'block';
-            document.getElementById('uwScore').innerText = '0';
-            scene.background = new THREE.Color(0x1a0000);
-            scene.fog.color.setHex(0x1a0000);
-            ceiling.visible = true;
-            moon.visible = false;
-            glow.visible = false;
-            ambientLight.color.setHex(0x550000);
-            dirLight.color.setHex(0xff3300);
-            dirLight.position.set(0, 10, 10);
-            leftWall.material = wallMatFire;
-            rightWall.material = wallMatFire;
-            cityGroup.children.forEach(b => {
-                b.material.color.setHex(0x110000);
-                b.material.emissive.setHex(0xff3300);
-                b.material.emissiveIntensity = 0.8;
-                b.children.forEach(child => {
-                    if (child.material && child.material.color) child.material.color.setHex(0xffaa00);
-                    if (child.material && child.material instanceof THREE.LineBasicMaterial) child.material.color.setHex(0xff5500);
-                });
-            });
-            clearAllObstacles();
-        }
-
-        function exitUnderworld() {
-            isUnderworld = false;
-            underworldPoints = 0;
-            document.getElementById('underworldUI').style.display = 'none';
-            scene.background = new THREE.Color(0x0d0221);
-            scene.fog.color.setHex(0x0d0221);
-            ceiling.visible = false;
-            moon.visible = true;
-            glow.visible = true;
-            ambientLight.color.setHex(0x404080);
-            dirLight.color.setHex(0xaaddff);
-            dirLight.position.set(0, 20, 10);
-            leftWall.material = wallMatNormal;
-            rightWall.material = wallMatNormal;
-            cityGroup.children.forEach(b => {
-                b.material.color.setHex(0x0a0515);
-                b.material.emissive.setHex(0x1a0b2e);
-                b.material.emissiveIntensity = 0.2;
-                b.children.forEach(child => {
-                    if (child.material && child.material.color) child.material.color.setHex(0x00ffff);
-                    if (child.material && child.material instanceof THREE.LineBasicMaterial) child.material.color.setHex(0x00ffff);
-                });
-            });
-            clearAllObstacles();
-        }
-
-        function animate() {
-            animationId = requestAnimationFrame(animate);
-            if (!gameRunning || isPaused) return;
-
-            player.position.x += (targetX - player.position.x) * 0.15;
-            player.position.x = Math.max(-8.5, Math.min(8.5, player.position.x));
-            player.rotation.x -= speed * 0.3;
-            player.rotation.z = (player.position.x - targetX) * -0.1;
-
-            frameCount++;
-            if (frameCount % 40 === 0) {
-                spawnObstacle();
-                score++;
-                document.getElementById('score').innerText = score;
-                if (!isUnderworld && score > 0 && score % 30 === 0) {
-                    speed += 0.015;
-                    level++;
-                    document.getElementById('level').innerText = level;
-                    currentMelodyIndex = (level - 1) % melodies.length;
-                }
-            }
-
-            updateRollingSound(speed);
-
-            for (let i = obstacles.length - 1; i >= 0; i--) {
-                let obs = obstacles[i];
-                obs.position.z += speed;
-
-                if (obs.userData.type === 'moving') {
-                    const time = Date.now() * 0.002;
-                    if (obs.userData.moveAxis === 'x') obs.position.x = obs.userData.initialX + Math.sin(time) * obs.userData.moveRange;
-                    else if (obs.userData.moveAxis === 'y') obs.position.y = obs.userData.initialY + Math.sin(time) * obs.userData.moveRange;
-                }
-
-                if (checkCollision(player, obs) && gameRunning) {
-                    if (obs.userData.type === 'pit') {
-                        enterUnderworld();
-                        scene.remove(obs);
-                        if (obs.geometry) obs.geometry.dispose();
-                        if (obs.material) obs.material.dispose();
-                        obstacles.splice(i, 1);
-                        continue;
+            if (Math.max(absX, absY) > 30) { // Threshold
+                if (absX > absY) {
+                    // Horizontal swipe
+                    if (dx > 0) {
+                        // Right
+                        if (currentLane < 2) currentLane++;
                     } else {
-                        gameOver();
+                        // Left
+                        if (currentLane > 0) currentLane--;
+                    }
+                } else {
+                    // Vertical swipe
+                    if (dy > 0) {
+                        // Down
+                        if (!isRolling) startRoll();
+                    } else {
+                        // Up
+                        if (!isJumping) {
+                            isJumping = true;
+                            jumpVelocity = jumpForce;
+                        }
                     }
                 }
+            }
+        }
 
-                if (isUnderworld && !obs.userData.passed && obs.position.z > player.position.z) {
-                    obs.userData.passed = true;
-                    underworldPoints++;
-                    document.getElementById('uwScore').innerText = underworldPoints;
-                    if (underworldPoints >= underworldTarget) exitUnderworld();
+        function createPlayer() {
+            const playerGroup = new THREE.Group();
+
+            // Body
+            const bodyGeo = new THREE.BoxGeometry(1, 2, 0.5);
+            const bodyMat = new THREE.MeshStandardMaterial({ color: 0xff0000 });
+            const body = new THREE.Mesh(bodyGeo, bodyMat);
+            body.position.y = 1;
+            body.castShadow = true;
+            playerGroup.add(body);
+
+            // Head
+            const headGeo = new THREE.BoxGeometry(0.6, 0.6, 0.6);
+            const headMat = new THREE.MeshStandardMaterial({ color: 0xffcc99 });
+            const head = new THREE.Mesh(headGeo, headMat);
+            head.position.y = 2.3;
+            head.castShadow = true;
+            playerGroup.add(head);
+
+            player = playerGroup;
+            player.position.set(LANES[currentLane], 0, 0);
+            scene.add(player);
+        }
+
+        function handleKeyDown(event) {
+            if (!gameRunning) return;
+            switch(event.code) {
+                case 'ArrowLeft':
+                    if (currentLane > 0) currentLane--;
+                    break;
+                case 'ArrowRight':
+                    if (currentLane < 2) currentLane++;
+                    break;
+                case 'ArrowUp':
+                case 'Space':
+                    if (!isJumping) {
+                        isJumping = true;
+                        jumpVelocity = jumpForce;
+                    }
+                    break;
+                case 'ArrowDown':
+                    if (!isRolling) {
+                        startRoll();
+                    }
+                    break;
+            }
+        }
+
+        function startRoll() {
+            if (isJumping) return;
+            isRolling = true;
+            player.scale.y = 0.5;
+            player.children[0].position.y = 0.5; // Body
+            player.children[1].position.y = 1.15; // Head
+
+            setTimeout(() => {
+                isRolling = false;
+                player.scale.y = 1;
+                player.children[0].position.y = 1;
+                player.children[1].position.y = 2.3;
+            }, 1000);
+        }
+
+        function createEnvironment() {
+            // Main ground
+            const groundGeo = new THREE.PlaneGeometry(100, 1000);
+            const groundMat = new THREE.MeshStandardMaterial({ color: 0x444444 });
+            const ground = new THREE.Mesh(groundGeo, groundMat);
+            ground.rotation.x = -Math.PI / 2;
+            ground.receiveShadow = true;
+            scene.add(ground);
+
+            // Lanes/Rails
+            LANES.forEach(x => {
+                const railGeo = new THREE.BoxGeometry(0.2, 0.1, 1000);
+                const railMat = new THREE.MeshStandardMaterial({ color: 0x222222 });
+
+                const leftRail = new THREE.Mesh(railGeo, railMat);
+                leftRail.position.set(x - 0.7, 0.05, -450);
+                scene.add(leftRail);
+
+                const rightRail = new THREE.Mesh(railGeo, railMat);
+                rightRail.position.set(x + 0.7, 0.05, -450);
+                scene.add(rightRail);
+
+                // Sleepers
+                for(let i=0; i<200; i++) {
+                    const sleeperGeo = new THREE.BoxGeometry(1.8, 0.05, 0.3);
+                    const sleeper = new THREE.Mesh(sleeperGeo, railMat);
+                    sleeper.position.set(x, 0.02, -i * 5);
+                    scene.add(sleeper);
+                }
+            });
+
+            // Side Walls
+            const wallGeo = new THREE.BoxGeometry(1, 10, 1000);
+            const wallMat = new THREE.MeshStandardMaterial({ color: 0x888888 });
+            const leftWall = new THREE.Mesh(wallGeo, wallMat);
+            leftWall.position.set(-10, 5, -450);
+            scene.add(leftWall);
+            const rightWall = new THREE.Mesh(wallGeo, wallMat);
+            rightWall.position.set(10, 5, -450);
+            scene.add(rightWall);
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        function spawnObstacle() {
+            const laneIndex = Math.floor(Math.random() * 3);
+            const type = Math.random();
+            let mesh;
+
+            if (type < 0.3) {
+                // Low Barrier (jump over)
+                const group = new THREE.Group();
+                const barGeo = new THREE.BoxGeometry(3.5, 0.5, 0.5);
+                const barMat = new THREE.MeshStandardMaterial({ color: 0xffaa00 });
+                const bar = new THREE.Mesh(barGeo, barMat);
+                bar.position.y = 1;
+                group.add(bar);
+
+                const legGeo = new THREE.BoxGeometry(0.2, 1, 0.2);
+                const legL = new THREE.Mesh(legGeo, barMat);
+                legL.position.set(-1.5, 0.5, 0);
+                group.add(legL);
+                const legR = new THREE.Mesh(legGeo, barMat);
+                legR.position.set(1.5, 0.5, 0);
+                group.add(legR);
+
+                mesh = group;
+                mesh.position.set(LANES[laneIndex], 0, -100);
+                mesh.userData = { type: 'barrier', height: 1.2 };
+            } else if (type < 0.6) {
+                // High Barrier (roll under)
+                const group = new THREE.Group();
+                const barGeo = new THREE.BoxGeometry(3.5, 1.5, 0.5);
+                const barMat = new THREE.MeshStandardMaterial({ color: 0xff4400 });
+                const bar = new THREE.Mesh(barGeo, barMat);
+                bar.position.y = 2.5;
+                group.add(bar);
+
+                const legGeo = new THREE.BoxGeometry(0.2, 3, 0.2);
+                const legL = new THREE.Mesh(legGeo, barMat);
+                legL.position.set(-1.5, 1.5, 0);
+                group.add(legL);
+                const legR = new THREE.Mesh(legGeo, barMat);
+                legR.position.set(1.5, 1.5, 0);
+                group.add(legR);
+
+                mesh = group;
+                mesh.position.set(LANES[laneIndex], 0, -100);
+                mesh.userData = { type: 'high_barrier', height: 3 };
+            } else {
+                // Train
+                const group = new THREE.Group();
+                const bodyGeo = new THREE.BoxGeometry(3.5, 4, 15);
+                const bodyMat = new THREE.MeshStandardMaterial({ color: 0x3333ff });
+                const body = new THREE.Mesh(bodyGeo, bodyMat);
+                body.position.y = 2;
+                group.add(body);
+
+                // Windows
+                const winGeo = new THREE.PlaneGeometry(0.8, 1);
+                const winMat = new THREE.MeshStandardMaterial({ color: 0x88ccff, emissive: 0x224466 });
+                for(let i=0; i<4; i++) {
+                    const winL = new THREE.Mesh(winGeo, winMat);
+                    winL.position.set(-1.76, 2.5, -5 + i*3.3);
+                    winL.rotation.y = -Math.PI/2;
+                    group.add(winL);
+                    const winR = new THREE.Mesh(winGeo, winMat);
+                    winR.position.set(1.76, 2.5, -5 + i*3.3);
+                    winR.rotation.y = Math.PI/2;
+                    group.add(winR);
                 }
 
-                if (obs.position.z > 15) {
-                    scene.remove(obs);
-                    if (obs.geometry) obs.geometry.dispose();
-                    if (obs.material) obs.material.dispose();
-                    obstacles.splice(i, 1);
-                }
+                mesh = group;
+                mesh.position.set(LANES[laneIndex], 0, -100);
+                mesh.userData = { type: 'train', height: 4 };
             }
 
-            gridHelper.position.z += speed;
-            if (gridHelper.position.z > -20) gridHelper.position.z = -40;
-            leftWall.position.z += speed;
-            if (leftWall.position.z > -20) leftWall.position.z = -40;
-            rightWall.position.z += speed;
-            if (rightWall.position.z > -20) rightWall.position.z = -40;
-            ceiling.position.z += speed;
-            if (ceiling.position.z > -20) ceiling.position.z = -40;
-            cityGroup.position.z += speed;
-            if (cityGroup.position.z > 15) cityGroup.position.z = -40;
+            mesh.traverse(child => {
+                if (child.isMesh) {
+                    child.castShadow = true;
+                    child.receiveShadow = true;
+                }
+            });
+            scene.add(mesh);
+            obstacles.push(mesh);
+        }
 
-            renderer.render(scene, camera);
+        function spawnCoin() {
+            const laneIndex = Math.floor(Math.random() * 3);
+            const geo = new THREE.CylinderGeometry(0.5, 0.5, 0.1, 16);
+            const mat = new THREE.MeshStandardMaterial({ color: 0xffff00, metalness: 0.8, roughness: 0.2 });
+            const coin = new THREE.Mesh(geo, mat);
+            coin.rotation.x = Math.PI / 2;
+            coin.position.set(LANES[laneIndex], 1.5, -100);
+            scene.add(coin);
+            collectibleCoins.push(coin);
         }
 
         function startGame() {
             document.getElementById('startScreen').style.display = 'none';
-            document.getElementById('ui').style.display = 'block';
-            document.getElementById('pauseBtn').style.display = 'block';
-            if (!audioCtx) initAudio();
-            if (audioCtx.state === 'suspended') audioCtx.resume();
-            if (animationId) cancelAnimationFrame(animationId);
+            document.getElementById('ui').style.display = 'flex';
+            clock.start();
             gameRunning = true;
             animate();
+        }
+
+        function restartGame() {
+            location.reload(); // Simple reload for now
         }
 
         function gameOver() {
             gameRunning = false;
-            isPaused = false;
-            document.getElementById('pauseScreen').style.display = 'none';
-            playCrashSound();
-            stopAllSounds();
-            document.getElementById('finalScore').innerText = score;
+            document.getElementById('ui').style.display = 'none';
             document.getElementById('gameOverScreen').style.display = 'flex';
-            camera.position.x = (Math.random() - 0.5) * 1;
-            camera.position.y = isUnderworld ? 3 + (Math.random() - 0.5) * 1 : 6 + (Math.random() - 0.5) * 1;
+            document.getElementById('finalScore').innerText = Math.floor(score);
         }
 
-        function restartGame() {
-            if (animationId) cancelAnimationFrame(animationId);
-            gameRunning = true;
-            isPaused = false;
-            isUnderworld = false;
-            underworldPoints = 0;
-            nextPitScore = 60;
-            score = 0;
-            level = 1;
-            currentMelodyIndex = 0;
-            speed = 0.2;
-            frameCount = 0;
-            targetX = 0;
-            player.position.x = 0;
-            player.position.y = 1;
-            player.rotation.set(0, 0, 0);
-            camera.position.set(0, 6, 12);
-            scene.background = new THREE.Color(0x0d0221);
-            scene.fog.color.setHex(0x0d0221);
-            ceiling.visible = false;
-            moon.visible = true;
-            glow.visible = true;
-            ambientLight.color.setHex(0x404080);
-            dirLight.color.setHex(0xaaddff);
-            dirLight.position.set(0, 20, 10);
-            leftWall.material = wallMatNormal;
-            rightWall.material = wallMatNormal;
-            cityGroup.children.forEach(b => {
-                b.material.color.setHex(0x0a0515);
-                b.material.emissive.setHex(0x1a0b2e);
-                b.material.emissiveIntensity = 0.2;
-                b.children.forEach(child => {
-                    if (child.material && child.material.color) child.material.color.setHex(0x00ffff);
-                    if (child.material && child.material instanceof THREE.LineBasicMaterial) child.material.color.setHex(0x00ffff);
-                });
-            });
-            document.getElementById('score').innerText = '0';
-            document.getElementById('level').innerText = '1';
-            document.getElementById('underworldUI').style.display = 'none';
-            document.getElementById('gameOverScreen').style.display = 'none';
-            document.getElementById('pauseScreen').style.display = 'none';
-            document.getElementById('pauseBtn').innerText = '⏸';
-            clearAllObstacles();
-            if (melodyTimer) window.clearTimeout(melodyTimer);
-            currentStep = 0;
-            nextNoteTime = audioCtx.currentTime + 0.1;
-            scheduler();
-            animate();
+        function checkCollision() {
+            // Use a slightly smaller box for player to be more forgiving
+            const playerBox = new THREE.Box3().setFromObject(player);
+            playerBox.expandByVector(new THREE.Vector3(-0.2, -0.1, -0.2));
+
+            // Obstacles
+            for (let i = 0; i < obstacles.length; i++) {
+                const obstacle = obstacles[i];
+                const obstacleBox = new THREE.Box3().setFromObject(obstacle);
+
+                if (playerBox.intersectsBox(obstacleBox)) {
+                    // Special case for rolling under high barriers
+                    if (isRolling && obstacle.userData.type === 'high_barrier') {
+                        // Pass through if rolling
+                        continue;
+                    }
+                    gameOver();
+                    return;
+                }
+            }
+
+            // Coins
+            for (let i = collectibleCoins.length - 1; i >= 0; i--) {
+                const coinBox = new THREE.Box3().setFromObject(collectibleCoins[i]);
+                if (playerBox.intersectsBox(coinBox)) {
+                    scene.remove(collectibleCoins[i]);
+                    collectibleCoins.splice(i, 1);
+                    coins++;
+                    document.getElementById('coins').innerText = coins;
+                }
+            }
         }
 
-        window.addEventListener('resize', () => {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
-        });
+        function animate() {
+            if (!gameRunning) return;
+            requestAnimationFrame(animate);
+
+            let delta = clock.getDelta();
+            if (delta > 0.1) delta = 0.1; // Cap delta to prevent large jumps
+
+            // Player movement
+            player.position.x += (LANES[currentLane] - player.position.x) * 0.2;
+
+            if (isJumping) {
+                player.position.y += jumpVelocity;
+                jumpVelocity -= gravity;
+                if (player.position.y <= 0) {
+                    player.position.y = 0;
+                    isJumping = false;
+                    jumpVelocity = 0;
+                }
+            }
+
+            // Spawning
+            spawnTimer += delta;
+            if (spawnTimer > 1.5) {
+                if (Math.random() > 0.3) spawnObstacle();
+                else spawnCoin();
+                spawnTimer = 0;
+            }
+
+            // Move Obstacles
+            for (let i = obstacles.length - 1; i >= 0; i--) {
+                obstacles[i].position.z += speed * delta;
+                if (obstacles[i].position.z > 10) {
+                    scene.remove(obstacles[i]);
+                    obstacles.splice(i, 1);
+                }
+            }
+
+            // Move Coins
+            for (let i = collectibleCoins.length - 1; i >= 0; i--) {
+                collectibleCoins[i].position.z += speed * delta;
+                collectibleCoins[i].rotation.y += 0.05;
+                if (collectibleCoins[i].position.z > 10) {
+                    scene.remove(collectibleCoins[i]);
+                    collectibleCoins.splice(i, 1);
+                }
+            }
+
+            checkCollision();
+
+            // Basic movement (mocking speed)
+            score += 10 * delta;
+            document.getElementById('score').innerText = Math.floor(score);
+
+            renderer.render(scene, camera);
+        }
+
+        init();
     </script>
 </body>
 </html>
