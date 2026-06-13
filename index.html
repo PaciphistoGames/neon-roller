@@ -76,14 +76,14 @@
 <body>
 
     <div id="startScreen" class="screen" style="display: flex;">
-        <h1>NEON ROLLER: UNDERWORLD</h1>
-        <p>Уворачивайся от блоков.<br>Избегай красных ям!<br>Рекомендуется включить звук 🔊</p>
+        <h1>NEON SURFER: SUBWAY</h1>
+        <p>Свайпай влево/вправо для смены линии.<br>Свайп вверх - прыжок, вниз - слайд.<br>Собирай монеты и избегай препятствий!<br>Рекомендуется включить звук 🔊</p>
         <button class="menu-btn" onclick="startGame()">НАЧАТЬ ИГРУ</button>
     </div>
 
     <div id="ui">
         <button id="pauseBtn" onclick="togglePause()">⏸</button>
-        УРОВЕНЬ: <span id="level">1</span> | СЧЕТ: <span id="score">0</span>
+        УРОВЕНЬ: <span id="level">1</span> | 🪙: <span id="coins">0</span> | СЧЕТ: <span id="score">0</span>
     </div>
     <div id="underworldUI">⚠ НИЖНИЙ УРОВЕНЬ: <span id="uwScore">0</span>/30 ⚠</div>
     
@@ -274,11 +274,26 @@
         glow.position.set(0, 25, -70);
         scene.add(glow);
 
-        const playerGeo = new THREE.SphereGeometry(1, 32, 32);
-        const playerMat = new THREE.MeshStandardMaterial({ color: 0x4cc9f0, roughness: 0.2, metalness: 0.8, emissive: 0x0f3460, emissiveIntensity: 0.2 });
-        const player = new THREE.Mesh(playerGeo, playerMat);
+        const playerGroup = new THREE.Group();
+        const playerBodyGeo = new THREE.BoxGeometry(1.2, 0.2, 2.5);
+        const playerBodyMat = new THREE.MeshStandardMaterial({ color: 0x4cc9f0, emissive: 0x4cc9f0, emissiveIntensity: 0.5 });
+        const playerBody = new THREE.Mesh(playerBodyGeo, playerBodyMat);
+        playerBody.castShadow = true;
+        playerGroup.add(playerBody);
+
+        const engineGeo = new THREE.CylinderGeometry(0.3, 0.3, 0.5, 16);
+        const engineMat = new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0x4cc9f0, emissiveIntensity: 1 });
+        const engine1 = new THREE.Mesh(engineGeo, engineMat);
+        engine1.rotation.x = Math.PI/2;
+        engine1.position.set(0.4, -0.2, -1);
+        engine1.castShadow = true;
+        playerGroup.add(engine1);
+        const engine2 = engine1.clone();
+        engine2.position.x = -0.4;
+        playerGroup.add(engine2);
+
+        const player = playerGroup;
         player.position.y = 1; player.position.z = 0;
-        player.castShadow = true;
         scene.add(player);
 
         const gridHelper = new THREE.GridHelper(100, 100, 0x16213e, 0x0f3460);
@@ -347,10 +362,19 @@
         let obstacles = [];
         let gameRunning = false;
         let score = 0;
+        let coins = 0;
         let level = 1;
         let speed = 0.2;
         let frameCount = 0;
         let targetX = 0;
+        let currentLane = 1; // 0: Left, 1: Middle, 2: Right
+        const lanes = [-6, 0, 6];
+
+        let isJumping = false;
+        let jumpVelocity = 0;
+        const gravity = -0.015;
+        let isSliding = false;
+        let slideTimer = 0;
 
         function clearAllObstacles() {
             for (let i = obstacles.length - 1; i >= 0; i--) {
@@ -365,14 +389,64 @@
             }
         }
 
-        function updateTargetX(clientX) {
-            targetX = ((clientX / window.innerWidth) * 2 - 1) * 10;
-        }
-        window.addEventListener('touchmove', (e) => {
-            e.preventDefault();
-            updateTargetX(e.touches[0].clientX);
+        let touchStartX = 0;
+        let touchStartY = 0;
+
+        window.addEventListener('touchstart', (e) => {
+            touchStartX = e.touches[0].clientX;
+            touchStartY = e.touches[0].clientY;
         }, { passive: false });
-        window.addEventListener('mousemove', (e) => { updateTargetX(e.clientX); });
+
+        window.addEventListener('touchend', (e) => {
+            let touchEndX = e.changedTouches[0].clientX;
+            let touchEndY = e.changedTouches[0].clientY;
+            handleSwipe(touchStartX, touchStartY, touchEndX, touchEndY);
+        }, { passive: false });
+
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowLeft') moveLane(-1);
+            if (e.key === 'ArrowRight') moveLane(1);
+            if (e.key === 'ArrowUp') jump();
+            if (e.key === 'ArrowDown') slide();
+        });
+
+        function handleSwipe(startX, startY, endX, endY) {
+            let dx = endX - startX;
+            let dy = endY - startY;
+            if (Math.abs(dx) > Math.abs(dy)) {
+                if (Math.abs(dx) > 30) {
+                    if (dx > 0) moveLane(1);
+                    else moveLane(-1);
+                }
+            } else {
+                if (Math.abs(dy) > 30) {
+                    if (dy > 0) slide();
+                    else jump();
+                }
+            }
+        }
+
+        function moveLane(dir) {
+            currentLane = Math.max(0, Math.min(2, currentLane + dir));
+            targetX = lanes[currentLane];
+        }
+
+        function jump() {
+            if (!isJumping && !isSliding) {
+                isJumping = true;
+                jumpVelocity = 0.4;
+            }
+        }
+
+        function slide() {
+            if (!isSliding) {
+                isSliding = true;
+                slideTimer = 60;
+                if (isJumping) {
+                    jumpVelocity = -0.4; // Fast fall
+                }
+            }
+        }
 
         function spawnObstacle() {
             if (score >= nextPitScore && !isUnderworld && score > 0) {
@@ -380,29 +454,48 @@
                 nextPitScore += 60;
                 return;
             }
-            const width = Math.random() * 4 + 2;
-            const geo = new THREE.BoxGeometry(width, 1.5, 1.5);
-            let mat, type = 'normal', moveAxis = null, moveRange = 0;
 
-            if (!isUnderworld && level >= 3 && Math.random() < 0.3) {
+            let type = 'normal';
+            let geo, mat;
+            let moveAxis = null, moveRange = 0;
+            let posX = lanes[Math.floor(Math.random() * 3)];
+            let posY = 0.75;
+
+            const rand = Math.random();
+            if (!isUnderworld && rand < 0.2) {
+                type = 'barrier'; // Jump over
+                geo = new THREE.BoxGeometry(4, 1.5, 0.5);
+                mat = new THREE.MeshStandardMaterial({ color: 0xff00ff, emissive: 0xff00ff, emissiveIntensity: 0.5 });
+                posY = 0.75;
+            } else if (!isUnderworld && rand < 0.4) {
+                type = 'overpass'; // Slide under
+                geo = new THREE.BoxGeometry(4, 2, 0.5);
+                mat = new THREE.MeshStandardMaterial({ color: 0x00ffff, emissive: 0x00ffff, emissiveIntensity: 0.5 });
+                posY = 2.5;
+            } else if (!isUnderworld && level >= 3 && rand < 0.6) {
                 type = 'moving';
                 moveAxis = Math.random() > 0.5 ? 'x' : 'y';
                 moveRange = moveAxis === 'x' ? 2.5 : 1.5;
+                geo = new THREE.BoxGeometry(2, 1.5, 1.5);
                 mat = new THREE.MeshStandardMaterial({ color: 0xffaa00, emissive: 0x553300, emissiveIntensity: 0.5 });
+                posY = moveAxis === 'y' ? 3 : 0.75;
             } else if (isUnderworld) {
                 mat = new THREE.MeshStandardMaterial({ color: 0x39ff14, emissive: 0x105005, emissiveIntensity: 0.6 });
+                geo = new THREE.BoxGeometry(3, 1.5, 1.5);
                 if (Math.random() < 0.4) {
                     type = 'moving';
                     moveAxis = Math.random() > 0.5 ? 'x' : 'y';
                     moveRange = moveAxis === 'x' ? 3 : 2;
+                    posY = moveAxis === 'y' ? 3 : 0.75;
                 }
             } else {
+                geo = new THREE.BoxGeometry(4, 1.5, 1.5);
                 mat = new THREE.MeshStandardMaterial({ color: 0xe94560, emissive: 0x501020, emissiveIntensity: 0.4 });
             }
 
             const obs = new THREE.Mesh(geo, mat);
-            obs.position.x = (Math.random() - 0.5) * 16;
-            obs.position.y = type === 'moving' && moveAxis === 'y' ? 3 : 0.75;
+            obs.position.x = posX;
+            obs.position.y = posY;
             obs.position.z = -70;
             obs.castShadow = true;
             obs.userData = { type, moveAxis, moveRange, initialX: obs.position.x, initialY: obs.position.y, passed: false };
@@ -414,7 +507,7 @@
             const geo = new THREE.CylinderGeometry(1.5, 1.5, 0.2, 32);
             const mat = new THREE.MeshStandardMaterial({ color: 0xff0000, emissive: 0xff0000, emissiveIntensity: 0.8 });
             const pit = new THREE.Mesh(geo, mat);
-            pit.position.x = (Math.random() - 0.5) * 16;
+            pit.position.x = lanes[Math.floor(Math.random() * 3)];
             pit.position.y = 0.1;
             pit.position.z = -70;
             pit.userData = { type: 'pit', passed: false };
@@ -422,14 +515,29 @@
             obstacles.push(pit);
         }
 
+        function spawnCoin() {
+            const geo = new THREE.TorusGeometry(0.5, 0.15, 8, 16);
+            const mat = new THREE.MeshStandardMaterial({ color: 0xffff00, emissive: 0x888800, emissiveIntensity: 0.5 });
+            const coin = new THREE.Mesh(geo, mat);
+            coin.position.x = lanes[Math.floor(Math.random() * 3)];
+            coin.position.y = 1;
+            coin.position.z = -70;
+            coin.userData = { type: 'coin' };
+            scene.add(coin);
+            obstacles.push(coin);
+        }
+
         function checkCollision(p, o) {
             const dx = Math.abs(p.position.x - o.position.x);
             const dz = Math.abs(p.position.z - o.position.z);
             const dy = Math.abs(p.position.y - o.position.y);
+
+            if (o.userData.type === 'coin') return dz < 1.2 && dx < 1.2 && dy < 1.2;
             if (o.userData.type === 'pit') return dz < 1.5 && dx < 1.5;
+
             const obsHalfWidth = o.geometry.parameters.width / 2;
             const obsHalfHeight = o.geometry.parameters.height / 2;
-            return dz < 1.2 && dx < (1 + obsHalfWidth - 0.3) && dy < (1 + obsHalfHeight - 0.3);
+            return dz < 1.2 && dx < (obsHalfWidth + 0.5) && dy < (obsHalfHeight + (isSliding ? 0.5 : 1) - 0.3);
         }
 
         function enterUnderworld() {
@@ -457,6 +565,23 @@
                 });
             });
             clearAllObstacles();
+        }
+
+        function createExplosion(x, y, z, color) {
+            const count = 10;
+            for (let i = 0; i < count; i++) {
+                const geo = new THREE.BoxGeometry(0.2, 0.2, 0.2);
+                const mat = new THREE.MeshStandardMaterial({ color: color, emissive: color, emissiveIntensity: 1 });
+                const p = new THREE.Mesh(geo, mat);
+                p.position.set(x, y, z);
+                p.userData = {
+                    type: 'particle',
+                    velocity: new THREE.Vector3((Math.random() - 0.5) * 0.2, (Math.random() - 0.5) * 0.2, (Math.random() - 0.5) * 0.2),
+                    life: 1.0
+                };
+                scene.add(p);
+                obstacles.push(p);
+            }
         }
 
         function exitUnderworld() {
@@ -489,14 +614,44 @@
             animationId = requestAnimationFrame(animate);
             if (!gameRunning || isPaused) return;
 
+            // Horizontal Movement
             player.position.x += (targetX - player.position.x) * 0.15;
             player.position.x = Math.max(-8.5, Math.min(8.5, player.position.x));
-            player.rotation.x -= speed * 0.3;
+
+            // Jump Logic
+            if (isJumping) {
+                player.position.y += jumpVelocity;
+                jumpVelocity += gravity;
+                if (player.position.y <= 1) {
+                    player.position.y = 1;
+                    isJumping = false;
+                    jumpVelocity = 0;
+                }
+            }
+
+            // Slide Logic
+            if (isSliding) {
+                slideTimer--;
+                player.scale.y = 0.5;
+                if (!isJumping) player.position.y = 0.5;
+                if (slideTimer <= 0) {
+                    isSliding = false;
+                    player.scale.y = 1;
+                    if (!isJumping) player.position.y = 1;
+                }
+            }
+
+            // Tilt for horizontal movement
             player.rotation.z = (player.position.x - targetX) * -0.1;
+            // Slight tilt for jumping/sliding
+            if (isJumping) player.rotation.x = -0.2;
+            else if (isSliding) player.rotation.x = 0.2;
+            else player.rotation.x = 0;
 
             frameCount++;
             if (frameCount % 40 === 0) {
-                spawnObstacle();
+                if (Math.random() > 0.3) spawnObstacle();
+                else spawnCoin();
                 score++;
                 document.getElementById('score').innerText = score;
                 if (!isUnderworld && score > 0 && score % 30 === 0) {
@@ -517,10 +672,29 @@
                     const time = Date.now() * 0.002;
                     if (obs.userData.moveAxis === 'x') obs.position.x = obs.userData.initialX + Math.sin(time) * obs.userData.moveRange;
                     else if (obs.userData.moveAxis === 'y') obs.position.y = obs.userData.initialY + Math.sin(time) * obs.userData.moveRange;
+                } else if (obs.userData.type === 'particle') {
+                    obs.position.add(obs.userData.velocity);
+                    obs.userData.life -= 0.02;
+                    obs.material.opacity = obs.userData.life;
+                    obs.material.transparent = true;
+                    if (obs.userData.life <= 0) {
+                        scene.remove(obs);
+                        obstacles.splice(i, 1);
+                        continue;
+                    }
                 }
 
                 if (checkCollision(player, obs) && gameRunning) {
-                    if (obs.userData.type === 'pit') {
+                    if (obs.userData.type === 'coin') {
+                        coins++;
+                        document.getElementById('coins').innerText = coins;
+                        createExplosion(obs.position.x, obs.position.y, obs.position.z, 0xffff00);
+                        scene.remove(obs);
+                        if (obs.geometry) obs.geometry.dispose();
+                        if (obs.material) obs.material.dispose();
+                        obstacles.splice(i, 1);
+                        continue;
+                    } else if (obs.userData.type === 'pit') {
                         enterUnderworld();
                         scene.remove(obs);
                         if (obs.geometry) obs.geometry.dispose();
@@ -592,12 +766,14 @@
             underworldPoints = 0;
             nextPitScore = 60;
             score = 0;
+            coins = 0;
             level = 1;
             currentMelodyIndex = 0;
             speed = 0.2;
             frameCount = 0;
-            targetX = 0;
-            player.position.x = 0;
+            currentLane = 1;
+            targetX = lanes[currentLane];
+            player.position.x = targetX;
             player.position.y = 1;
             player.rotation.set(0, 0, 0);
             camera.position.set(0, 6, 12);
@@ -621,6 +797,7 @@
                 });
             });
             document.getElementById('score').innerText = '0';
+            document.getElementById('coins').innerText = '0';
             document.getElementById('level').innerText = '1';
             document.getElementById('underworldUI').style.display = 'none';
             document.getElementById('gameOverScreen').style.display = 'none';
