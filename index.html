@@ -70,6 +70,13 @@
             box-shadow: 0 4px 15px rgba(76, 201, 240, 0.4);
         }
     </style>
+    <!-- PWA Manifest & Icons -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#4cc9f0">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="apple-touch-icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><rect width='512' height='512' rx='100' fill='%23050510'/><circle cx='256' cy='256' r='120' fill='%234cc9f0' stroke='%230f3460' stroke-width='20'/></svg>">
+
     <!-- THREE.JS ЛОКАЛЬНО (положи three.min.js рядом с этим файлом) -->
     <script src="three.min.js"></script>
 </head>
@@ -639,6 +646,15 @@
             camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight);
         });
+
+        // Register Service Worker for PWA
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('sw.js')
+                    .then((reg) => console.log('Service Worker registered successfully:', reg.scope))
+                    .catch((err) => console.error('Service Worker registration failed:', err));
+            });
+        }
     </script>
 </body>
 </html>
